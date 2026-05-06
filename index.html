@@ -559,29 +559,11 @@ function parseCSV(text) {
 
 async function loadFromSheet() {
   showLoading();
-  const DIRECT = "https://docs.google.com/spreadsheets/d/1ClU4uLMfoAmCYs46zJj3lPSrdJpCqH-xkyo601HTN_k/export?format=csv&gid=1695601128";
-  const proxies = [
-    `https://corsproxy.io/?url=${encodeURIComponent(DIRECT)}`,
-    `https://api.allorigins.win/raw?url=${encodeURIComponent(DIRECT)}`,
-    `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(DIRECT)}`
-  ];
-  let text = null;
-  for (const url of proxies) {
-    try {
-      const res = await fetch(url, {signal: AbortSignal.timeout(8000)});
-      if (!res.ok) continue;
-      const buf = await res.arrayBuffer();
-      text = new TextDecoder('utf-8').decode(buf);
-      if (text && text.length > 100) break;
-    } catch(e) { continue; }
-  }
-  if (!text || text.length < 100) {
-    document.getElementById('tableBody').innerHTML = '<tr><td colspan="6" style="text-align:center;padding:48px;color:#c0392b;font-size:13px">⚠️ 데이터를 불러오지 못했습니다.<br>잠시 후 🔄 새로고침을 눌러주세요.</td></tr>';
-    return;
-  }
   try {
-    const data = parseCSV(text);
-    if (data.length === 0) throw new Error('데이터 없음');
+    const res = await fetch(SCRIPT_URL, {signal: AbortSignal.timeout(10000)});
+    if (!res.ok) throw new Error('fetch failed');
+    const data = await res.json();
+    if (!Array.isArray(data) || data.length === 0) throw new Error('데이터 없음');
     RAW.length = 0;
     data.forEach(d => RAW.push(d));
     filtered = [...RAW];
@@ -590,7 +572,7 @@ async function loadFromSheet() {
     document.getElementById('updateTime').textContent = '📅 ' + new Date().toLocaleString('ko-KR', {year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit'}) + ' 업데이트';
     showToast('✅ ' + data.length + '건 불러오기 완료!');
   } catch(e) {
-    document.getElementById('tableBody').innerHTML = '<tr><td colspan="6" style="text-align:center;padding:48px;color:#c0392b;font-size:13px">⚠️ 데이터 파싱 실패.<br>구글 시트 형식을 확인해주세요.</td></tr>';
+    document.getElementById('tableBody').innerHTML = '<tr><td colspan="6" style="text-align:center;padding:48px;color:#c0392b;font-size:13px">⚠️ 데이터를 불러오지 못했습니다.<br>잠시 후 🔄 새로고침을 눌러주세요.</td></tr>';
   }
 }
 
