@@ -509,6 +509,8 @@
 
 <script>
 
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyA0wNMhUNcZqFAwRji11rTdzcqS38F3xFLRmz5UWxSA4wO-OWxRbMSo0nVmM1fs981/exec';
+
 let RAW = [];
 let filtered = [];
 let sortKey = null;
@@ -542,6 +544,7 @@ function parseCSV(text) {
   const ini = headers.findIndex(h => h.includes('입고수량'));
   const si = headers.findIndex(h => h.includes('재고수량'));
   const pi = headers.findIndex(h => h.includes('판매여부'));
+  const ri = headers.findIndex(h => h.includes('실재고'));
   const result = [];
   for (let i = 1; i < lines.length; i++) {
     const c = splitLine(lines[i]);
@@ -549,7 +552,7 @@ function parseCSV(text) {
     const inQty = parseInt(c[ini]);
     const stQty = parseInt(c[si]);
     if (isNaN(inQty) && isNaN(stQty)) continue;
-    result.push({ 교재명: c[ni]||'', 강사명: c[ii]||'', 입고수량: isNaN(inQty)?0:inQty, 재고수량: isNaN(stQty)?0:stQty, 판매여부: c[pi]||'' });
+    result.push({ 교재명: c[ni]||'', 강사명: c[ii]||'', 입고수량: isNaN(inQty)?0:inQty, 재고수량: isNaN(stQty)?0:stQty, 판매여부: c[pi]||'', 실재고: ri>=0?(c[ri]||''):'' });
   }
   return result;
 }
@@ -634,7 +637,7 @@ function render() {
     empty.style.display = 'none';
     tbody.innerHTML = filtered.map(r => {
       const idx = RAW.indexOf(r);
-      const saved = realStock[idx] !== undefined ? realStock[idx] : '';
+      const saved = realStock[idx] !== undefined ? realStock[idx] : (r.실재고 || '');
       const filledClass = saved !== '' ? 'filled' : '';
       const stockClass = r.재고수량 <= 0 ? (r.재고수량 < 0 ? 'num-negative' : 'num-zero') : r.재고수량 < 5 ? 'num-low' : 'num-positive';
       const lowBadge = r.재고수량 > 0 && r.재고수량 < 5 ? '<span class="low-badge">재고부족</span>' : '';
@@ -645,7 +648,7 @@ function render() {
         '<td class="td-num num-zero">' + r.입고수량.toLocaleString() + '</td>' +
         '<td class="td-num ' + stockClass + '">' + r.재고수량.toLocaleString() + lowBadge + '</td>' +
         '<td><span class="badge ' + badgeClass + '">' + r.판매여부 + '</span></td>' +
-        '<td style="text-align:right"><input class="real-stock-input ' + filledClass + '" type="number" data-idx="' + idx + '" value="' + saved + '" placeholder="-"></td>' +
+        '<td style="text-align:right"><input class="real-stock-input ' + filledClass + '" type="number" data-idx="' + idx + '" data-name="' + escHtml(r.교재명) + '" value="' + saved + '" placeholder="-"></td>' +
         '</tr>';
     }).join('');
   }
@@ -658,11 +661,21 @@ function render() {
   document.getElementById('countStock').textContent = stock;
 
   document.querySelectorAll('.real-stock-input').forEach(input => {
+    let saveTimer = null;
     input.addEventListener('input', function() {
       const idx = parseInt(this.dataset.idx);
+      const name = this.dataset.name;
       const val = this.value.trim();
       if (val === '') { delete realStock[idx]; this.classList.remove('filled'); }
       else { realStock[idx] = val; this.classList.add('filled'); }
+      clearTimeout(saveTimer);
+      saveTimer = setTimeout(() => {
+        fetch(SCRIPT_URL, {
+          method: 'POST',
+          body: JSON.stringify({ name: name, value: val }),
+          headers: { 'Content-Type': 'text/plain' }
+        }).then(() => showToast('✅ 저장됐어요!')).catch(() => showToast('⚠️ 저장 실패'));
+      }, 800);
     });
     input.addEventListener('focus', function() { this.select(); });
   });
